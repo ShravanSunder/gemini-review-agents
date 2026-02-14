@@ -11,7 +11,7 @@ Methodology ported from [quorum-counsel](../plugins/quorum-counsel/) and Claude 
 gemini extensions link ./extensions/gemini-review
 
 # Or from a git URL
-gemini extensions install <repo-url>
+gemini extensions install https://github.com/ShravanSunder/gemini-review-agents
 ```
 
 ### Prerequisites
