@@ -1,0 +1,21 @@
+description = "Review all changes on current branch vs a base branch. Usage: /review:branch <base> (default: main)"
+prompt = """
+Conduct a code review of the current branch against the base branch.
+
+Base branch: {{args}}
+If no base branch was specified above, use "main" as the default.
+
+Changed files:
+!{BASE={{args}}; BASE=${BASE:-main}; git diff --name-only $(git merge-base HEAD "$BASE")}
+
+Diff stat:
+!{BASE={{args}}; BASE=${BASE:-main}; git diff --stat $(git merge-base HEAD "$BASE")}
+
+Diff:
+!{BASE={{args}}; BASE=${BASE:-main}; git diff $(git merge-base HEAD "$BASE")}
+
+Recent commits on this branch:
+!{BASE={{args}}; BASE=${BASE:-main}; git log --oneline $(git merge-base HEAD "$BASE")..HEAD}
+
+Follow the review orchestration procedure in your context to delegate to security-reviewer, correctness-reviewer, and quality-reviewer sub-agents, then synthesize their findings.
+"""

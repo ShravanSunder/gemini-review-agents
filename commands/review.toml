@@ -1,0 +1,17 @@
+description = "Review uncommitted code changes (staged + unstaged) with sub-agent delegation."
+prompt = """
+Conduct a code review of the following uncommitted changes.
+
+Scope: uncommitted (staged + unstaged)
+
+Changed files:
+!{git diff --name-only HEAD}
+
+Diff stat:
+!{git diff --stat HEAD}
+
+Diff:
+!{git diff HEAD}
+
+Follow the review orchestration procedure in your context to delegate to security-reviewer, correctness-reviewer, and quality-reviewer sub-agents, then synthesize their findings.
+"""

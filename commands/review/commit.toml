@@ -1,0 +1,20 @@
+description = "Review a specific commit. Usage: /review:commit <sha>"
+prompt = """
+Conduct a code review of the following commit.
+
+Commit: {{args}}
+
+Commit message:
+!{git log --format='%s%n%n%b' -1 {{args}}}
+
+Changed files:
+!{git show --name-only --format='' {{args}}}
+
+Diff stat:
+!{git show --stat --format='' {{args}}}
+
+Diff:
+!{git show {{args}}}
+
+Follow the review orchestration procedure in your context to delegate to security-reviewer, correctness-reviewer, and quality-reviewer sub-agents, then synthesize their findings.
+"""

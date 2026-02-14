@@ -1,0 +1,23 @@
+description = "Review a GitHub pull request. Usage: /review:pr <number>"
+prompt = """
+Conduct a code review of the following GitHub pull request.
+
+PR number: {{args}}
+
+PR metadata:
+!{gh pr view {{args}} --json title,body,labels,state,author}
+
+Changed files:
+!{gh pr diff {{args}} --name-only}
+
+Diff stat:
+!{gh pr diff {{args}} | diffstat 2>/dev/null || echo "(diffstat not available)"}
+
+Existing review comments:
+!{gh pr view {{args}} --json reviews,comments --jq '.reviews[].body, .comments[].body' 2>/dev/null || echo "No comments"}
+
+Diff:
+!{gh pr diff {{args}}}
+
+Follow the review orchestration procedure in your context to delegate to security-reviewer, correctness-reviewer, and quality-reviewer sub-agents, then synthesize their findings.
+"""
