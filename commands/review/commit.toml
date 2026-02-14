@@ -16,5 +16,5 @@ Diff stat:
 Diff:
 !{git show {{args}}}
 
-Follow the review orchestration procedure in your context to delegate to security-reviewer, correctness-reviewer, and quality-reviewer sub-agents, then synthesize their findings.
+Review these changes following the methodology in your context. Print all findings to the terminal.
 """

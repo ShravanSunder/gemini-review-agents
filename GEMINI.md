@@ -1,130 +1,85 @@
 # gemini-review
 
-Code review extension with sub-agent delegation. Splits reviews into specialized dimensions (security, correctness, quality), then synthesizes findings with confidence scoring.
+Code review extension. Output all findings directly to the terminal.
 
-**Commands**: `/review`, `/review:branch`, `/review:commit`, `/review:pr`
-**Prerequisite**: `experimental.enableAgents: true` in Gemini CLI settings
+**Do NOT create directories. Do NOT write files. All output goes to the terminal.**
 
----
+## Review Procedure
 
-## Review Orchestration Procedure
+When a review command is invoked:
 
-When a review command is invoked, follow these steps exactly:
+1. Read the diff provided by the command.
+2. Read surrounding code for context using `read_file` and `grep_search`.
+3. If sub-agents are available (security-reviewer, correctness-reviewer, quality-reviewer), delegate to them. Otherwise, review all dimensions yourself.
+4. Score each finding for confidence and severity.
+5. Print the full review to the terminal using the output format below.
 
-### Step 1: Identify Scope
+## Review Dimensions
 
-The command prompt provides the diff and scope. Note the scope type (uncommitted, branch, commit, PR) and the list of changed files.
+### Security & Silent Failures
+- Injection (SQL, NoSQL, XSS, command injection)
+- Auth bypass, privilege escalation, missing auth checks
+- Secrets in code, PII leaks, path traversal, SSRF
+- Race conditions, TOCTOU
+- For EVERY catch/fallback/error-handler: is error logged? Does user get feedback? Could catch hide unrelated errors? Empty catch = P0
 
-### Step 2: Create Output Directory
+### Bugs & Correctness
+- Logic errors, off-by-one, wrong variable, inverted conditions
+- Null/undefined dereference, missing boundary checks
+- Type coercion bugs, implicit conversions
+- Edge cases: empty collections, boundary values, overflow
+- Missing error handling, unhandled rejections, unclosed resources
 
-```bash
-mkdir -p /tmp/gemini-review/$(date +%Y%m%d-%H%M%S)/
-```
+### Quality & Patterns
+- Does code follow existing codebase patterns?
+- Test gaps (rate criticality 1-10)
+- Stale comments describing old behavior (comment rot)
+- Performance: O(n^2) where O(n) possible, N+1 queries, memory leaks
 
-Store the directory path — you will write all reports here.
+## Severity
 
-### Step 3: Delegate to Sub-Agents
-
-Call each sub-agent **in sequence**, passing:
-- The review scope (e.g., "uncommitted changes", "PR #123")
-- The list of changed files from the command output
-- The shell command to retrieve the diff (e.g., `git diff HEAD`)
-- Any additional context from the user's conversation
-
-Call these three sub-agents:
-1. **security-reviewer** — security vulnerabilities, auth issues, silent failures
-2. **correctness-reviewer** — bugs, logic errors, edge cases, error handling
-3. **quality-reviewer** — patterns, test gaps, comment accuracy, performance
-
-Each sub-agent returns findings in this format:
-```
-[Confidence: XX] [P0] [category] Description — file:line
-```
-
-### Step 4: Synthesize Findings
-
-Collect all findings from the three sub-agents. Then apply:
-
-**4a. De-duplicate (Consensus Detection)**
-If two or more sub-agents flag the same file:line with a similar description:
-- Mark the finding as **CONSENSUS**
-- Add **+15 confidence bonus** to each matching finding (cap at 100)
-- This rescues borderline findings: e.g., 75 + 15 = 90
-
-**4b. Apply Threshold**
-Discard any finding with confidence < 80 (after consensus bonus).
-
-**4c. Sort**
-1. CONSENSUS findings first (highest trust)
-2. Then by confidence descending
-3. Then by severity: P0 > P1 > P2 > P3
-
-**4d. Determine Verdict**
-- **PASS**: 0 findings at P0 or P1, and 2 or fewer at P2
-- **PASS WITH CONCERNS**: 0 findings at P0, any at P1 or P2
-- **REVISE**: any P0, or 3+ findings at P1
-
-### Step 5: Write Detailed Reports
-
-Write these files to the output directory:
-- `summary.md` — All findings grouped by severity, then by sub-agent source. Include evidence and reasoning for each finding.
-- `security.md` — Full security-reviewer output
-- `correctness.md` — Full correctness-reviewer output
-- `quality.md` — Full quality-reviewer output
-
-Each finding in the detailed reports must include:
-- Confidence score, severity, category
-- Description of the issue
-- File path and line number
-- Evidence from the code (quote the relevant lines)
-- Why this is a problem and what to do about it
-
-### Step 6: Return Terminal Summary
-
-Print a brief summary (15-20 lines max) to the terminal:
-
-```
-**Review Complete** — {scope}
-**Verdict**: {PASS | PASS WITH CONCERNS | REVISE}
-**Findings**: {count} issues (confidence >= 80) | {consensus_count} consensus
-
-**Critical Issues** ({count}):
-- [P0] [Confidence: 95] {description} — {file:line}
-- [P1] [Confidence: 88] {description} — {file:line}
-
-**Top Recommendations**:
-1. {most important action item}
-2. {second most important}
-
-**Detailed Report**: /tmp/gemini-review/{id}/summary.md
-```
-
-If there are no findings above the confidence threshold, report:
-```
-**Review Complete** — {scope}
-**Verdict**: PASS
-**Findings**: 0 issues above confidence threshold
-
-No actionable findings. Code looks clean.
-```
-
----
-
-## Ignore List
-
-Do NOT report any of the following:
-- Pre-existing issues not introduced in this changeset
-- Issues that linters, typecheckers, or CI would catch
-- Pedantic nitpicks that a senior engineer would not flag
-- Issues on lines that were not modified in the diff
-- Intentional functionality changes that are part of the broader changeset
-- Issues silenced by lint-ignore comments (e.g., `// eslint-disable`, `# noqa`)
-
----
-
-## Severity Reference
-
-- **P0 / CRITICAL**: Exploitable security issue, data loss or corruption, authorization bypass, crash in common path
-- **P1 / HIGH**: High-likelihood bug, major performance regression, concurrency hazard, broken API contract
+- **P0 / CRITICAL**: Exploitable security, data loss/corruption, authz bypass, crash in common path
+- **P1 / HIGH**: High-likelihood bug, major perf regression, concurrency hazard, broken API contract
 - **P2 / MEDIUM**: Edge-case bug, maintainability risk, incomplete error handling, moderate test gap
 - **P3 / LOW**: Minor cleanup, nits only if they materially improve clarity
+
+## Confidence Scoring
+
+Score every finding 0-100. **Only report findings with confidence >= 80.**
+
+## Ignore (Do NOT Report)
+
+- Pre-existing issues not in this changeset
+- Issues linters/typecheckers/CI would catch
+- Nitpicks a senior engineer wouldn't flag
+- Issues on unmodified lines
+- Intentional changes
+- Lint-ignore silenced issues
+
+## Output Format
+
+Print directly to terminal:
+
+```
+## Review — {scope}
+
+**Verdict**: {PASS | PASS WITH CONCERNS | REVISE}
+
+### Findings
+
+- **[P0] [95] [security]** SQL injection in user query — `src/api/users.ts:42`
+  Unsanitized input passed to query builder. Use parameterized queries.
+
+- **[P1] [88] [bug]** Missing null check — `src/utils/parse.ts:17`
+  `data.items` can be undefined when API returns empty response.
+
+### Recommendations
+
+1. Most important action
+2. Second most important
+```
+
+Verdict rules:
+- **PASS**: 0 findings P0-P1, ≤2 P2
+- **PASS WITH CONCERNS**: 0 P0, any P1-P2
+- **REVISE**: any P0, or 3+ P1
