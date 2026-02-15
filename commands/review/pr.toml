@@ -1,6 +1,6 @@
 description = "Review a GitHub pull request. Usage: /review:pr <number>"
 prompt = """
-Conduct a code review of the following GitHub pull request.
+You are a code reviewer. Review the following GitHub pull request thoroughly.
 
 PR number: {{args}}
 
@@ -19,5 +19,85 @@ Existing review comments:
 Diff:
 !{gh pr diff {{args}}}
 
-Review these changes following the methodology in your context. Print all findings to the terminal.
+---
+
+## MANDATORY: Gather Context
+
+Before reviewing, you MUST read each changed file in full using read_file. Do not review from the diff alone. Understanding surrounding code is required for accurate findings.
+
+For each file listed in "Changed files" above, call read_file on that file now.
+
+## Review Dimensions
+
+Analyze every changed line against ALL of these:
+
+**Security & Silent Failures**
+- Injection (SQL, NoSQL, XSS, command injection)
+- Auth bypass, privilege escalation, missing auth checks
+- Secrets in code, PII leaks, path traversal, SSRF
+- Race conditions, TOCTOU
+- For EVERY catch/fallback/error-handler: is error logged with context? Does user get feedback? Could catch hide unrelated errors? Empty catch = P0
+
+**Bugs & Correctness**
+- Logic errors, off-by-one, wrong variable, inverted conditions
+- Null/undefined dereference, missing boundary checks
+- Type coercion bugs, implicit conversions
+- Edge cases: empty collections, boundary values, overflow
+- Missing error handling, unhandled rejections, unclosed resources
+
+**Quality & Patterns**
+- Does code follow existing codebase patterns?
+- Test gaps: for each significant new code path, is there a test?
+- Stale comments describing old behavior (comment rot)
+- Performance: O(n^2) where O(n) possible, N+1 queries, memory leaks
+
+## Severity
+
+- **P0 / CRITICAL**: Exploitable security, data loss/corruption, authz bypass, crash in common path
+- **P1 / HIGH**: High-likelihood bug, major perf regression, concurrency hazard, broken API contract
+- **P2 / MEDIUM**: Edge-case bug, maintainability risk, incomplete error handling, moderate test gap
+- **P3 / LOW**: Minor cleanup, nits only if they materially improve clarity
+
+## Confidence
+
+Score every finding 0-100. **Only report findings with confidence >= 80.**
+
+## Ignore (Do NOT Report)
+
+- Pre-existing issues not in this changeset
+- Issues linters/typecheckers/CI would catch
+- Nitpicks a senior engineer wouldn't flag
+- Issues on unmodified lines
+- Intentional changes with clear rationale
+
+## Output
+
+Do NOT write files. Do NOT create directories. Print everything directly to the terminal.
+
+Format:
+
+## Review — PR #{{args}}
+
+**Verdict**: {PASS | PASS WITH CONCERNS | REVISE}
+
+### Findings
+
+For each finding, use this exact format:
+
+**[P{n}] [Confidence: {score}] [{category}]** {title} — `{file}:{line}`
+> {quote the relevant code from the diff or file}
+
+{Why this is a problem. What specifically to do about it.}
+
+Categories: security, silent-failure, bug, error-handling, test-gap, pattern, performance, comment-rot
+
+### Recommendations
+
+1. Most important action
+2. Second most important action
+
+Verdict rules:
+- **PASS**: 0 findings P0-P1, ≤2 P2
+- **PASS WITH CONCERNS**: 0 P0, any P1-P2
+- **REVISE**: any P0, or 3+ P1
 """
